@@ -71,10 +71,11 @@ OVPN_LDAP_BASE_DN=''
 OVPN_LDAP_USER_SEARCH_FILTER=''
 OVPN_LDAP_BIND_DN=''
 OVPN_LDAP_BIND_PASSWORD=''
+OVPN_GOOGLE_LDAP=0
 
 DEFAULT_LDAP_USER_SEARCH_FILTER="(&(objectclass=inetorgperson)(cn=%u))"
 
-while getopts "u:B:U:b:p:" opt; do
+while getopts "u:B:U:b:p:g" opt; do
     case $opt in
         u)
             OVPN_LDAP_URL="$OPTARG"
@@ -91,6 +92,9 @@ while getopts "u:B:U:b:p:" opt; do
         p)
             OVPN_LDAP_BIND_PASSWORD="$OPTARG"
             ;;
+	g)
+            OVPN_GOOGLE_LDAP=1
+	    ;;
         \?)
             set +x
             echo "Invalid option: -$OPTARG" >&2
@@ -121,18 +125,23 @@ if [ -f "$conf" ]; then
     mv "$conf" "$bak"
 fi
 
+if [ "${OVPN_GOOGLE_LDAP}" == "1" ]; then
+  LDAP_CONF="TLSEnable"$'\t'"false"$'\n'$'\t'"TLSCACertDir"$'\t'"/etc/ssl/certs"$'\n'$'\t'"TLSCertFile"$'\t'"/etc/openvpn/ldap-clent.crt"$'\n'$'\t'"TLSKeyFile"$'\t'"/etc/openvpn/ldap-clent.key"
+else
+  LDAP_CONF="BindDN"$'\t'$'\t'"${OVPN_LDAP_BIND_DN}"$'\n'$'\t'"Password"$'\t'"${OVPN_LDAP_BIND_PASSWORD}"
+fi
+
 cat > "$conf" <<EOF
 <LDAP>
-	URL		                "${OVPN_LDAP_URL}"
-	BindDN	                "${OVPN_LDAP_BIND_DN}"
-	Password	            "${OVPN_LDAP_BIND_PASSWORD}"
-	Timeout		            15
+	URL		${OVPN_LDAP_URL}
+	Timeout		15
+	${LDAP_CONF}
 </LDAP>
 
 <Authorization>
-	BaseDN		            "${OVPN_LDAP_BASE_DN}"
-	SearchFilter	        "${OVPN_LDAP_USER_SEARCH_FILTER}"
-	RequireGroup	        false
+	BaseDN		${OVPN_LDAP_BASE_DN}
+	SearchFilter	${OVPN_LDAP_USER_SEARCH_FILTER}
+	RequireGroup    false
 </Authorization>
 EOF
 
